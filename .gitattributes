@@ -1,0 +1,10 @@
+# Enforce LF for files that ship to Linux (Dockerfile, cron, shell scripts)
+# regardless of the developer's OS line-ending setting.
+* text=auto
+
+Dockerfile          text eol=lf
+*.sh                text eol=lf
+*.cron              text eol=lf
+deploy/*.cron       text eol=lf
+docker-compose.yml  text eol=lf
+requirements.txt    text eol=lf
