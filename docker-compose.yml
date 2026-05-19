@@ -1,0 +1,18 @@
+# Local-development docker-compose. Not used in production -- the VM uses
+# host cron + `docker run --rm` (see deploy/upwork-vm.cron).
+#
+# Usage:
+#   cp .env.example .env   # fill in values
+#   docker compose run --rm scraper
+services:
+  scraper:
+    build: .
+    image: upwork-vm:local
+    env_file: .env
+    volumes:
+      - ./secrets/sa.json:/secrets/sa.json:ro
+      - ./state:/app/state
+      - ./logs:/app/logs
+      - ./job_titles.csv:/app/job_titles.csv:ro
+    # Restart only when explicitly invoked; this is a batch job, not a service.
+    restart: "no"

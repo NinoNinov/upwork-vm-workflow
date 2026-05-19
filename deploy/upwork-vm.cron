@@ -1,0 +1,6 @@
+# Upwork-VM-workflow daily run
+# Fires at 06:00 in the VM's local timezone. To pin to UTC, add CRON_TZ=UTC
+# above this line.
+#
+# Use the full path to docker so the crond environment can find it.
+0 6 * * * /usr/bin/docker run --rm --env-file /opt/upwork-vm/.env -v /opt/upwork-vm/sa.json:/secrets/sa.json:ro -v /opt/upwork-vm/state:/app/state -v /opt/upwork-vm/logs:/app/logs upwork-vm:latest >> /opt/upwork-vm/logs/cron.log 2>&1

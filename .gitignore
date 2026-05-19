@@ -1,0 +1,39 @@
+# --- Secrets / config --------------------------------------------------------
+.env
+.env.*
+!.env.example
+secrets/
+*.json.key
+sa.json
+
+# --- Runtime state (volume-mounted) -----------------------------------------
+state/
+logs/
+*.log
+debug.log
+
+# --- Python ------------------------------------------------------------------
+__pycache__/
+*.py[cod]
+*$py.class
+*.egg-info/
+.pytest_cache/
+.mypy_cache/
+.ruff_cache/
+.venv/
+venv/
+env/
+
+# --- IDE ---------------------------------------------------------------------
+.idea/
+.vscode/
+*.swp
+
+# --- OS ----------------------------------------------------------------------
+.DS_Store
+Thumbs.db
+
+# --- Build artifacts ---------------------------------------------------------
+dist/
+build/
+*.zip
