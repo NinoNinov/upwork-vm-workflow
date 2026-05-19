@@ -54,6 +54,10 @@ COPY job_titles.csv countries_continents.csv /app/
 # Volume-mounted in production; created here so first run has a writable dir.
 RUN mkdir -p /app/state /secrets /app/logs
 
+# Xvfb needs /tmp/.X11-unix to exist as world-writable + sticky. The non-root
+# scraper user can't create it at runtime (euid != 0), so do it here.
+RUN mkdir -p /tmp/.X11-unix && chmod 1777 /tmp/.X11-unix
+
 # Non-root user (gives chromium the sandbox it wants -- run with --no-sandbox via env).
 # seleniumbase writes uc_driver into its own site-packages dir at runtime, so the
 # drivers/ dir must be writable by the runtime user.
