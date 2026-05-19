@@ -55,7 +55,13 @@ if _PROXIES:
         # appears in stdout / cron logs.
         host = proxy.split("@", 1)[-1]
         logger.info("Launching browser via proxy %s", host)
-        return Driver("chrome", headless=self.headless, uc=True, proxy=proxy)
+        return Driver(
+            "chrome",
+            headless=self.headless,
+            uc=True,
+            proxy=proxy,
+            multi_proxy=True,  # required: each parallel worker uses its own proxy+auth
+        )
 
     JobsScraper.create_driver = _patched_create_driver
     logger.info("Proxy support active -- %d proxies loaded.", len(_PROXIES))
