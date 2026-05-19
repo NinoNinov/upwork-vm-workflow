@@ -3,7 +3,10 @@ FROM python:3.11-slim-bookworm
 # ---------------------------------------------------------------------------
 # System dependencies for chromium + seleniumbase
 # ---------------------------------------------------------------------------
-# chromium / chromium-driver: headless browser used by upwork_analysis
+# chromium / chromium-driver: browser used by upwork_analysis
+# xvfb: virtual framebuffer; lets us run Chromium with headless=false on a headless VM.
+#       Headless=true is fingerprinted by Cloudflare/Datadome, so non-headless + xvfb
+#       passes more captchas on datacenter IPs.
 # fonts-liberation, libnss3, libxss1, libasound2: standard chromium runtime libs
 # git: needed for `pip install git+https://...` of upwork_analysis
 # build-essential: a few transitive deps still need to compile
@@ -11,6 +14,7 @@ ENV DEBIAN_FRONTEND=noninteractive
 RUN apt-get update && apt-get install -y --no-install-recommends \
     chromium \
     chromium-driver \
+    xvfb \
     fonts-liberation \
     libasound2 \
     libnss3 \
@@ -58,4 +62,6 @@ RUN useradd --create-home --shell /bin/bash scraper && \
     chmod -R u+w /usr/local/lib/python3.11/site-packages/seleniumbase/drivers
 USER scraper
 
-ENTRYPOINT ["python", "-u", "main.py"]
+# xvfb-run wraps the process in a virtual display so chromium can launch with
+# headless=false. Add --auto-servernum so concurrent runs grab unique :NN displays.
+ENTRYPOINT ["xvfb-run", "--auto-servernum", "--server-args=-screen 0 1920x1080x24", "python", "-u", "main.py"]
