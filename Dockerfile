@@ -49,9 +49,13 @@ COPY job_titles.csv countries_continents.csv /app/
 # Volume-mounted in production; created here so first run has a writable dir.
 RUN mkdir -p /app/state /secrets /app/logs
 
-# Non-root user (gives chromium the sandbox it wants -- run with --no-sandbox via env)
+# Non-root user (gives chromium the sandbox it wants -- run with --no-sandbox via env).
+# seleniumbase writes uc_driver into its own site-packages dir at runtime, so the
+# drivers/ dir must be writable by the runtime user.
 RUN useradd --create-home --shell /bin/bash scraper && \
-    chown -R scraper:scraper /app /secrets
+    chown -R scraper:scraper /app /secrets && \
+    chown -R scraper:scraper /usr/local/lib/python3.11/site-packages/seleniumbase/drivers && \
+    chmod -R u+w /usr/local/lib/python3.11/site-packages/seleniumbase/drivers
 USER scraper
 
 ENTRYPOINT ["python", "-u", "main.py"]
