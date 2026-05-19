@@ -15,6 +15,7 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
     chromium \
     chromium-driver \
     xvfb \
+    xauth \
     fonts-liberation \
     libasound2 \
     libnss3 \
