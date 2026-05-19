@@ -7,10 +7,13 @@ where the storage decision is made.
 """
 import concurrent.futures
 import logging
+import os
+import random
 import time
 from typing import Dict, Optional
 
 import pandas as pd
+from seleniumbase import Driver
 from tqdm import tqdm
 
 from config import ScrapingConfig
@@ -19,6 +22,45 @@ from upwork_analysis.scrape_data import JobsScraper
 from utils import exponential_backoff
 
 logger = logging.getLogger(__name__)
+
+
+def _proxy_list() -> list[str]:
+    """Parse UPWORK_PROXIES env var (comma-separated USER:PASS@HOST:PORT entries).
+
+    `http://` and `https://` prefixes are stripped because seleniumbase's
+    ``Driver(proxy=...)`` wants a bare auth string.
+    """
+    raw = os.environ.get("UPWORK_PROXIES", "")
+    out = []
+    for entry in raw.split(","):
+        entry = entry.strip()
+        if not entry:
+            continue
+        if "://" in entry:
+            entry = entry.split("://", 1)[1]
+        out.append(entry)
+    return out
+
+
+_PROXIES = _proxy_list()
+if _PROXIES:
+    # Monkey-patch JobsScraper.create_driver so every browser instance gets a
+    # random proxy from UPWORK_PROXIES. Upstream upwork_analysis has no proxy
+    # support, but seleniumbase's Driver() does -- we just wrap it.
+    _orig_create_driver = JobsScraper.create_driver
+
+    def _patched_create_driver(self):  # type: ignore[no-redef]
+        proxy = random.choice(_PROXIES)
+        # Log only host:port (strip credentials) so the proxy password never
+        # appears in stdout / cron logs.
+        host = proxy.split("@", 1)[-1]
+        logger.info("Launching browser via proxy %s", host)
+        return Driver("chrome", headless=self.headless, uc=True, proxy=proxy)
+
+    JobsScraper.create_driver = _patched_create_driver
+    logger.info("Proxy support active -- %d proxies loaded.", len(_PROXIES))
+else:
+    logger.info("UPWORK_PROXIES not set -- driving Chrome without a proxy.")
 
 
 class JobScraper:
