@@ -1,32 +1,36 @@
 FROM python:3.11-slim-bookworm
 
 # ---------------------------------------------------------------------------
-# System dependencies for chromium + seleniumbase
+# System dependencies for Google Chrome + seleniumbase
 # ---------------------------------------------------------------------------
-# chromium / chromium-driver: headless browser used by upwork_analysis
-# fonts-liberation, libnss3, libxss1, libasound2: standard chromium runtime libs
-# git: needed for `pip install git+https://...` of upwork_analysis
-# build-essential: a few transitive deps still need to compile
+# Real Google Chrome (NOT Debian's open-source chromium fork). Critical for
+# anti-bot bypass: Cloudflare/Datadome fingerprint several signals that differ
+# between the two (User-Agent string, Widevine DRM presence, bundled fonts).
+# xvfb + x11-utils: virtual display so Chrome can launch non-headless.
+# git / build-essential: needed for pip install of upwork_analysis from GitHub.
 ENV DEBIAN_FRONTEND=noninteractive
 RUN apt-get update && apt-get install -y --no-install-recommends \
-    chromium \
-    chromium-driver \
-    xvfb \
-    x11-utils \
-    fonts-liberation \
-    libasound2 \
-    libnss3 \
-    libxss1 \
-    libgbm1 \
-    libdrm2 \
-    git \
-    build-essential \
-    ca-certificates \
+    wget gnupg ca-certificates \
+    && wget -qO- https://dl.google.com/linux/linux_signing_key.pub | gpg --dearmor -o /usr/share/keyrings/google-linux-signing-key.gpg \
+    && echo "deb [arch=amd64 signed-by=/usr/share/keyrings/google-linux-signing-key.gpg] http://dl.google.com/linux/chrome/deb/ stable main" > /etc/apt/sources.list.d/google-chrome.list \
+    && apt-get update && apt-get install -y --no-install-recommends \
+        google-chrome-stable \
+        xvfb \
+        x11-utils \
+        fonts-liberation \
+        libasound2 \
+        libnss3 \
+        libxss1 \
+        libgbm1 \
+        libdrm2 \
+        git \
+        build-essential \
     && rm -rf /var/lib/apt/lists/*
 
-# Tell seleniumbase / chromedriver where Chrome lives
-ENV CHROME_BIN=/usr/bin/chromium \
-    CHROMEDRIVER_PATH=/usr/bin/chromedriver \
+# Point seleniumbase / undetected-chromedriver at the real Chrome binary.
+# chromedriver is installed by `python -m seleniumbase install chromedriver`
+# below -- it auto-matches the installed Chrome version.
+ENV CHROME_BIN=/usr/bin/google-chrome \
     PYTHONUNBUFFERED=1 \
     PYTHONDONTWRITEBYTECODE=1
 
@@ -38,8 +42,7 @@ WORKDIR /app
 COPY requirements.txt /app/requirements.txt
 RUN pip install --no-cache-dir -r /app/requirements.txt
 
-# Make seleniumbase's chromedriver match the installed chromium. Will use the
-# system chromedriver if versions already align (cheap fallback).
+# Install chromedriver matching the installed Google Chrome version.
 RUN python -m seleniumbase install chromedriver || true
 
 # ---------------------------------------------------------------------------
