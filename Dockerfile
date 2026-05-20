@@ -11,6 +11,8 @@ ENV DEBIAN_FRONTEND=noninteractive
 RUN apt-get update && apt-get install -y --no-install-recommends \
     chromium \
     chromium-driver \
+    xvfb \
+    x11-utils \
     fonts-liberation \
     libasound2 \
     libnss3 \
@@ -45,9 +47,15 @@ RUN python -m seleniumbase install chromedriver || true
 # ---------------------------------------------------------------------------
 COPY *.py /app/
 COPY job_titles.csv countries_continents.csv /app/
+COPY entrypoint.sh /app/entrypoint.sh
+RUN chmod +x /app/entrypoint.sh
 
 # Volume-mounted in production; created here so first run has a writable dir.
 RUN mkdir -p /app/state /secrets /app/logs
+
+# Xvfb needs /tmp/.X11-unix to exist as world-writable + sticky (the non-root
+# scraper user cannot create it at runtime: euid != 0).
+RUN mkdir -p /tmp/.X11-unix && chmod 1777 /tmp/.X11-unix
 
 # Non-root user (gives chromium the sandbox it wants -- run with --no-sandbox via env).
 # seleniumbase writes uc_driver into its own site-packages dir at runtime, so the
@@ -58,4 +66,4 @@ RUN useradd --create-home --shell /bin/bash scraper && \
     chmod -R u+w /usr/local/lib/python3.11/site-packages/seleniumbase/drivers
 USER scraper
 
-ENTRYPOINT ["python", "-u", "main.py"]
+ENTRYPOINT ["/app/entrypoint.sh"]
