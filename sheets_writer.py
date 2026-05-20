@@ -23,8 +23,8 @@ logger = logging.getLogger(__name__)
 # extended schema (CLAUDE.md "End-to-end data flow") with `extraction_date`
 # (no space) and includes the StableEncoder `_en` columns.
 COLUMNS: list[str] = [
-    "position", "title", "description", "time", "skills", "type",
-    "experience_level", "time_estimate", "budget", "proposals",
+    "position", "title", "url", "job_id", "description", "time", "time_raw",
+    "skills", "type", "experience_level", "time_estimate", "budget", "proposals",
     "client_location", "client_jobs_posted", "client_hire_rate",
     "client_hourly_rate", "client_total_spent", "continent", "extraction_date",
     "StartUp", "Valuation", "word_count", "description_label",

@@ -1,7 +1,8 @@
 # Scraper core (MIT-licensed, by Yazan Sharaya).
-# Pinned to a specific commit for reproducibility; bump when upstream changes.
-# Upstream has no git tags so we pin by SHA (HEAD of main as of 2026-05-19).
-upwork_analysis @ git+https://github.com/Yazan-Sharaya/upwork_analysis.git@e3cd8bd4f6c2a5e5374147d611923ef092c3518d
+# Pinned to our fork's commit SHA. The fork adds card-level location reading
+# (fixes stale-panel race), job url + job_id capture, and raw post-time text.
+# See UPWORK_ANALYSIS_ROADMAP.md for the full list of fork patches.
+upwork_analysis @ git+https://github.com/NinoNinov/upwork_analysis.git@96f0f2bf404b1444c26e0479c2839b52865a5dc4
 
 # Scraper transitive deps (also pulled in by upwork_analysis, listed for clarity)
 seleniumbase>=4.20
