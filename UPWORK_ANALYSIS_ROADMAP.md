@@ -7,16 +7,32 @@
 
 Source library lives at: `https://github.com/NinoNinov/upwork_analysis`
 
+**Current pin:** `e4417966ed538d62b42b8654c83de7a286a3f65d` (Tier 3 Step A landed)
+
+## Newly surfaced issues (post-Step A, 2026-05-20)
+
+These showed up when we navigated to the detail page directly:
+
+- **`time_raw` is empty for all rows.** Card-level `post_time_selector` (`.job-tile-header div small span:nth-child(2)`) no longer matches. Upwork redesigned this on the search results page.
+- **`client_jobs_posted` is empty for all rows.** Detail-page DOM differs from old panel DOM for this field.
+- **`client_total_spent` is ~50% populated.** Same root cause as above — selector matches some templates but not others.
+
+### Recommended next step
+
+Run a **diagnostic-dump** on a single live page: write a tiny helper that opens one search page + one detail page, dumps the raw HTML to a file, and inspect to find the current selectors. ~30 min.
+
+If that fixes `time_raw` + the new client-stats selectors, no further bigger refactor is needed.
+
 ---
 
 ## Tier 1 — High value, ~45 min total (Initial fork scope)
 
 | # | Improvement | What it gives you | Status |
 |---|---|---|---|
-| 1 | Fix `client_location` race condition (detail-panel reads stale data from previous click) | Accurate country per job (e.g., "United States" not "India") | **DEFERRED** — first card-level fix attempt matched the wrong DOM element (all 50 jobs came back "United Kingdom"). Needs live-HTML inspection to find the right card selector. Tracked in Tier 3 #9 (parallel detail fetching) which solves the race entirely. |
+| 1 | Fix `client_location` race condition (detail-panel reads stale data from previous click) | Accurate country per job (e.g., "United States" not "India") | **DONE via Tier 3 Step A** (fork SHA `e4417966`) — replaced click-panel pattern with `driver.get(detail_url)`. Side effect: scrape is ~3× slower until Step B parallelization. |
 | 2 | Add `url` field — extract `href` from the title anchor | Click-through links in scoring emails + future per-match proposal docs | **DONE** (fork SHA `dc955273`) |
 | 3 | Extract `job_id` from the URL (`~01abcd...` cipher) | Bullet-proof dedup key, survives Upwork re-wording the description | **DONE** (fork SHA `dc955273`) |
-| 4 | Keep raw posted-time text alongside the parsed timestamp | Diagnosability when `parse_time` fails | **DONE** (fork SHA `dc955273`) |
+| 4 | Keep raw posted-time text alongside the parsed timestamp | Diagnosability when `parse_time` fails | **BROKEN** — Upwork changed the search-page `post_time_selector` ~2026-05-20; current selector matches nothing. Needs diagnostic-dump approach to find new selector. |
 
 ### Implementation notes
 
