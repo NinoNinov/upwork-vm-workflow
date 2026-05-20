@@ -82,10 +82,11 @@ Email format: subject `Upwork: N matching job(s) of M new`, body lists matched j
 ### Sheet schema (32 columns; defined in `sheets_writer.COLUMNS`)
 `position, title, url, job_id, description, time, time_raw, skills, type, experience_level, time_estimate, budget, proposals, client_location, client_jobs_posted, client_hire_rate, client_hourly_rate, client_total_spent, continent, extraction_date, StartUp, Valuation, word_count, description_label, position_en, type_en, time_estimate_en, experience_level_en, client_location_en, continent_en, description_label_en, proposals_en`
 
-### Known broken / partial fields
-- `time_raw` -- empty for all rows. Upwork changed the search-page HTML for the post-time element; current `post_time_selector` no longer matches.
-- `client_jobs_posted` -- empty for all rows. Selector targets the old slide-in panel DOM; on the full detail page the layout differs.
-- `client_total_spent` -- partial (~50%). Same root cause as above; selector matches inconsistently.
+### Known broken / partial fields (after fork SHA `fcbfe6a`, 2026-05-20)
+- `time_raw` / `time` -- **FIXED**. New selector `small[data-test="job-pubilshed-date"]`; smoke test 10/10.
+- `client_total_spent` -- **FIXED selector** (`strong[data-qa="client-spend"]`, dropped the ` > span` constraint). Hit rate now varies by client: new clients legitimately have no spend yet, so blank cells here are real, not bugs.
+- `client_jobs_posted`, `client_hire_rate` -- **PERMANENTLY EMPTY**. Upwork removed these metrics from the DOM in May 2026; replaced by a new `client-hires` element we don't capture. Columns kept nullable to avoid a sheet rebuild.
+- `client_hourly_rate` -- present only on hourly listings with confirmed rates; expect blanks on fixed-price jobs.
 - All other fields populate correctly.
 
 ### Why scraping takes ~12 min instead of ~4 min
@@ -117,7 +118,8 @@ Pinned by SHA in `requirements.txt`. Roadmap and per-fix status in [UPWORK_ANALY
 | `96f0f2bf` | Tier 1 first cut: card-level location attempt + url + job_id + time_raw |
 | `dc955273` | Revert bad card-level location selectors (matched a sidebar element on every tile -> returned "United Kingdom" for all 50) |
 | `4d901e19` | Null-safety on post_time + description (placeholder articles were crashing) |
-| `e4417966` | **Current pin.** Tier 3 Step A: replace click-panel with `driver.get(detail_url)`. Kills location race. |
+| `e4417966` | Tier 3 Step A: replace click-panel with `driver.get(detail_url)`. Kills location race. |
+| `fcbfe6ad` | **Current pin.** Fix `post_time` (now `small[data-test="job-pubilshed-date"]`) and `client_total_spent` (drop ` > span`) after Upwork's May-2026 redesign. |
 
 ## Next steps (in priority order)
 

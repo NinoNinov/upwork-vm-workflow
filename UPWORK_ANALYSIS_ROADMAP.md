@@ -7,21 +7,17 @@
 
 Source library lives at: `https://github.com/NinoNinov/upwork_analysis`
 
-**Current pin:** `e4417966ed538d62b42b8654c83de7a286a3f65d` (Tier 3 Step A landed)
+**Current pin:** `fcbfe6ad71b637d892fe460534e64bab0437d099` (post-redesign selector fixes)
 
-## Newly surfaced issues (post-Step A, 2026-05-20)
+## Resolved via diagnostic-dump (2026-05-20)
 
-These showed up when we navigated to the detail page directly:
+`tools/dump_dom.py` + `tools/inspect_dump.py` captured one live search page + two detail pages and walked the DOM to find new `data-test` / `data-qa` hooks. Findings:
 
-- **`time_raw` is empty for all rows.** Card-level `post_time_selector` (`.job-tile-header div small span:nth-child(2)`) no longer matches. Upwork redesigned this on the search results page.
-- **`client_jobs_posted` is empty for all rows.** Detail-page DOM differs from old panel DOM for this field.
-- **`client_total_spent` is ~50% populated.** Same root cause as above — selector matches some templates but not others.
-
-### Recommended next step
-
-Run a **diagnostic-dump** on a single live page: write a tiny helper that opens one search page + one detail page, dumps the raw HTML to a file, and inspect to find the current selectors. ~30 min.
-
-If that fixes `time_raw` + the new client-stats selectors, no further bigger refactor is needed.
+- **`time_raw` / `time`** — selector now `small[data-test="job-pubilshed-date"]`. Text changed from "5 hours ago" to "Posted 5 hours ago"; we strip the prefix before `parse_time` and keep the prefixed form in `time_raw`. Smoke-test hit rate: **10/10**.
+- **`client_total_spent`** — selector changed from `strong[data-qa="client-spend"] > span` to just `strong[data-qa="client-spend"]`. The `> span` constraint missed clients whose template renders the value directly inside the `<strong>`.
+- **`client_location`** — old selector still works on the detail page (`ul.ac-items.list-unstyled > li:nth-child(1) > strong` → `"United States"`). No change needed.
+- **`client_jobs_posted` and `client_hire_rate`** — these metrics were **removed from Upwork's DOM**, replaced by a new `client-hires` element (e.g. "20 hires, 5 active"). Per product decision, columns kept nullable in the sheet (no schema change); these fields will be `None` going forward.
+- **Card-level location: confirmed NOT in the new DOM.** No shortcut around per-job detail navigation — Tier 3 Step B remains the only path to speed up by skipping detail.
 
 ---
 
@@ -32,7 +28,7 @@ If that fixes `time_raw` + the new client-stats selectors, no further bigger ref
 | 1 | Fix `client_location` race condition (detail-panel reads stale data from previous click) | Accurate country per job (e.g., "United States" not "India") | **DONE via Tier 3 Step A** (fork SHA `e4417966`) — replaced click-panel pattern with `driver.get(detail_url)`. Side effect: scrape is ~3× slower until Step B parallelization. |
 | 2 | Add `url` field — extract `href` from the title anchor | Click-through links in scoring emails + future per-match proposal docs | **DONE** (fork SHA `dc955273`) |
 | 3 | Extract `job_id` from the URL (`~01abcd...` cipher) | Bullet-proof dedup key, survives Upwork re-wording the description | **DONE** (fork SHA `dc955273`) |
-| 4 | Keep raw posted-time text alongside the parsed timestamp | Diagnosability when `parse_time` fails | **BROKEN** — Upwork changed the search-page `post_time_selector` ~2026-05-20; current selector matches nothing. Needs diagnostic-dump approach to find new selector. |
+| 4 | Keep raw posted-time text alongside the parsed timestamp | Diagnosability when `parse_time` fails | **DONE** (fork SHA `fcbfe6a`) — new selector `small[data-test="job-pubilshed-date"]`, strips "Posted " prefix before `parse_time`. |
 
 ### Implementation notes
 
