@@ -72,9 +72,15 @@ else:
 class JobScraper:
     """Handle job scraping operations."""
 
-    def __init__(self, config: ScrapingConfig) -> None:
+    def __init__(self, config: ScrapingConfig,
+                 known_job_ids: Optional[set[str]] = None) -> None:
         self.config = config
         self.processor = JobDataProcessor(config)
+        # Set of Upwork job ciphers (~01abcd...) the caller already has in their
+        # store. JobsScraper skips the per-job driver.get(detail_url) for these,
+        # cutting daily run time by the fraction of search results that are
+        # already known (typically 80-90% on day-to-day runs).
+        self.known_job_ids: set[str] = known_job_ids or set()
 
     def scrape_jobs_per_title_parallel(
         self, job_titles: Dict[str, int]
@@ -148,6 +154,7 @@ class JobScraper:
                 headless=self.config.headless,
                 workers=self.config.scraper_workers,
                 fast=self.config.fast,
+                known_job_ids=self.known_job_ids,
             )
             data = scraper.scrape_jobs()
             processed = self.processor.process_scraped_data(data, title)

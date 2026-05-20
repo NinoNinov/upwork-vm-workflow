@@ -89,11 +89,17 @@ Email format: subject `Upwork: N matching job(s) of M new`, body lists matched j
 - `client_hourly_rate` -- present only on hourly listings with confirmed rates; expect blanks on fixed-price jobs.
 - All other fields populate correctly.
 
-### Why scraping takes ~12 min instead of ~4 min
-After Tier 3 Step A (fork SHA `e4417966`), each job now triggers a full
-`driver.get(detail_url)` instead of the old click-panel pattern. Reliable but
-slow. Tier 3 Step B (parallel detail fetching across N workers) will bring
-this back to ~1 min total.
+### Scrape timing (after the known_job_ids skip, fork SHA `92dbb6c8`)
+Each job's `driver.get(detail_url)` costs ~15s. Daily runs save the bulk of
+that because `main.py` pre-loads `existing_job_ids()` from the sheet and
+hands them to `JobsScraper` — `parse_one_job` then short-circuits for any
+repeat, parsing only the cheap card-level fields and skipping the detail
+navigation. Typical daily run with 80%+ repeats: ~3-5 min (vs. ~12 min
+pre-skip). First-ever scrape of a new title is still slow because the
+skip-set is empty.
+
+Tier 3 Step B (parallel detail fetching) would cut the remainder further but
+requires +400MB RAM per Chrome worker — kept on the backlog until needed.
 
 ## VM path abandoned (read before considering Docker/Contabo for scraping)
 
@@ -119,7 +125,8 @@ Pinned by SHA in `requirements.txt`. Roadmap and per-fix status in [UPWORK_ANALY
 | `dc955273` | Revert bad card-level location selectors (matched a sidebar element on every tile -> returned "United Kingdom" for all 50) |
 | `4d901e19` | Null-safety on post_time + description (placeholder articles were crashing) |
 | `e4417966` | Tier 3 Step A: replace click-panel with `driver.get(detail_url)`. Kills location race. |
-| `fcbfe6ad` | **Current pin.** Fix `post_time` (now `small[data-test="job-pubilshed-date"]`) and `client_total_spent` (drop ` > span`) after Upwork's May-2026 redesign. |
+| `fcbfe6ad` | Fix `post_time` (now `small[data-test="job-pubilshed-date"]`) and `client_total_spent` (drop ` > span`) after Upwork's May-2026 redesign. |
+| `92dbb6c8` | **Current pin.** Add `known_job_ids` to `JobsScraper`; `parse_one_job` skips the per-job `driver.get(detail_url)` when job_id is already known. ~3× faster on typical daily runs (80%+ repeats). |
 
 ## Next steps (in priority order)
 
@@ -171,6 +178,6 @@ python -m pip install --force-reinstall --no-deps "upwork_analysis @ git+https:/
 - **Don't run the scraper in Docker/Linux** -- see "VM path abandoned" above. It will fail with Cloudflare captchas.
 - **`upwork_analysis` is pinned to OUR fork by commit SHA.** Upstream selectors break when Upwork redesigns; the fork is where we patch those.
 - **Sheet header is enforced** in `SheetsWriter.ensure_header()`. If you edit row 1 of `upwork_master` by hand the next scrape raises. Either match the 32-column schema exactly or delete the entire tab content to let the scraper rebuild.
-- **`description` is still the dedup key** even though we now have a stable `job_id`. Future work: switch dedup to `job_id` for robustness against Upwork re-wording descriptions.
+- **Dedup happens on `job_id` first, `description` as fallback** (rows pre-Tier-1 may lack `job_id`). Known `job_id`s are also fed into `JobsScraper` so its `parse_one_job` skips the per-job detail-page navigation for repeats — the daily speedup driver.
 - **n8n workflow draft vs active**: edits via the n8n MCP tool save as drafts; validation errors prevent promotion to active. After every workflow edit, verify in n8n UI that all nodes have credentials assigned and the workflow is toggled `Active`.
 - **OpenAI billing**: ~$0.001 per run at current volume (one batched gpt-4o-mini call per scrape). Top up the key periodically to avoid silent fails.

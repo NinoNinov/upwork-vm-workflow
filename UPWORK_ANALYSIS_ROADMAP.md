@@ -7,7 +7,7 @@
 
 Source library lives at: `https://github.com/NinoNinov/upwork_analysis`
 
-**Current pin:** `fcbfe6ad71b637d892fe460534e64bab0437d099` (post-redesign selector fixes)
+**Current pin:** `92dbb6c8eb5e05deb0e9abc2cb91cb9a10a2e39b` (known_job_ids skip + post-redesign selector fixes)
 
 ## Resolved via diagnostic-dump (2026-05-20)
 
@@ -54,7 +54,7 @@ Source library lives at: `https://github.com/NinoNinov/upwork_analysis`
 | # | Improvement | What it gives you |
 |---|---|---|
 | 8 | Native `proxy` parameter on `JobsScraper(...)` | Removes the monkey-patch in `job_scraper.py` |
-| 9 | **Replace popup-click pattern with parallel detail-page fetching** | **2–3× faster scrapes** (50 jobs: ~4 min → ~30–60 sec). Also eliminates the panel race condition entirely. |
+| 9 | **Replace popup-click pattern with parallel detail-page fetching** | **2–3× faster scrapes** (50 jobs: ~4 min → ~30–60 sec). Also eliminates the panel race condition entirely. **Partially mitigated** by the `known_job_ids` skip (fork SHA `92dbb6c8`) — daily runs already cut detail fetches to ~10-20% of cards. Full parallelization still on the backlog if first-day runs (empty skip-set) become a problem. |
 | 10 | Parse JSON-LD `<script>` blocks for canonical data | Replaces fragile DOM selectors for time/location/description |
 
 ---

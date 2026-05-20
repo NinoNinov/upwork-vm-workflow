@@ -157,11 +157,11 @@ class SheetsWriter:
                 "Either reset the sheet or update sheets_writer.COLUMNS."
             )
 
-    def existing_descriptions(self) -> set[str]:
-        """Return all non-empty description values currently in the sheet."""
+    def _existing_column(self, column: str) -> set[str]:
+        """Return the set of non-empty values currently in *column* (excludes header)."""
         ws = self._connect()
         try:
-            col_idx = COLUMNS.index("description") + 1  # 1-based
+            col_idx = COLUMNS.index(column) + 1  # 1-based
         except ValueError:
             return set()
         values = retry_with_backoff(
@@ -170,8 +170,20 @@ class SheetsWriter:
             exceptions=(APIError,),
             logger=logger,
         )
-        # Drop header (row 1) and empties
         return {v for v in values[1:] if v}
+
+    def existing_descriptions(self) -> set[str]:
+        """Return all non-empty description values currently in the sheet."""
+        return self._existing_column("description")
+
+    def existing_job_ids(self) -> set[str]:
+        """Return all non-empty job_id values currently in the sheet.
+
+        Used by the scraper to skip the expensive detail-page fetch for jobs
+        already in the persistent store. Older sheet rows pre-Tier-1 may not
+        have a job_id; those naturally get dedup'd by description instead.
+        """
+        return self._existing_column("job_id")
 
     def append_new(self, df: pd.DataFrame) -> dict:
         """
@@ -184,13 +196,34 @@ class SheetsWriter:
             return {"scraped": 0, "added": 0, "skipped_duplicate": 0}
 
         self.ensure_header()
-        existing = self.existing_descriptions()
+        existing_descriptions = self.existing_descriptions()
+        existing_job_ids = self.existing_job_ids()
 
-        # Filter: drop empty descriptions; dedup within batch and against sheet
+        # Dedup: drop empty descriptions; dedup within batch on (job_id OR
+        # description) and against sheet on the same. job_id is the canonical
+        # key (stable across Upwork re-wording the description), but rows
+        # without a job_id fall back to description so the legacy schema and
+        # captcha-placeholder articles still get filtered.
         before = len(df)
         df = df[df["description"].notna() & (df["description"] != "")]
-        df = df.drop_duplicates(subset=["description"], keep="first")
-        df = df[~df["description"].isin(existing)]
+        if "job_id" in df.columns:
+            # In-batch dedup: keep first occurrence per job_id (when present),
+            # else per description.
+            has_id = df["job_id"].notna() & (df["job_id"] != "")
+            df_with_id = df[has_id].drop_duplicates(subset=["job_id"], keep="first")
+            df_no_id = df[~has_id].drop_duplicates(subset=["description"], keep="first")
+            df = pd.concat([df_with_id, df_no_id], ignore_index=True)
+            # Vs-sheet dedup (recompute has_id on the concatenated frame so the
+            # mask aligns with the new index).
+            has_id = df["job_id"].notna() & (df["job_id"] != "")
+            against_sheet = (
+                (has_id & df["job_id"].isin(existing_job_ids))
+                | df["description"].isin(existing_descriptions)
+            )
+            df = df[~against_sheet]
+        else:
+            df = df.drop_duplicates(subset=["description"], keep="first")
+            df = df[~df["description"].isin(existing_descriptions)]
         added = len(df)
         skipped = before - added
 
