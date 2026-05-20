@@ -13,10 +13,10 @@ Source library lives at: `https://github.com/NinoNinov/upwork_analysis`
 
 | # | Improvement | What it gives you | Status |
 |---|---|---|---|
-| 1 | Fix `client_location` race condition (detail-panel reads stale data from previous click) | Accurate country per job (e.g., "United States" not "India") | TODO |
-| 2 | Add `url` field — extract `href` from the title anchor | Click-through links in scoring emails + future per-match proposal docs | TODO |
-| 3 | Extract `job_id` from the URL (`~01abcd...` cipher) | Bullet-proof dedup key, survives Upwork re-wording the description | TODO |
-| 4 | Keep raw posted-time text alongside the parsed timestamp | Diagnosability when `parse_time` fails | TODO |
+| 1 | Fix `client_location` race condition (detail-panel reads stale data from previous click) | Accurate country per job (e.g., "United States" not "India") | **DEFERRED** — first card-level fix attempt matched the wrong DOM element (all 50 jobs came back "United Kingdom"). Needs live-HTML inspection to find the right card selector. Tracked in Tier 3 #9 (parallel detail fetching) which solves the race entirely. |
+| 2 | Add `url` field — extract `href` from the title anchor | Click-through links in scoring emails + future per-match proposal docs | **DONE** (fork SHA `dc955273`) |
+| 3 | Extract `job_id` from the URL (`~01abcd...` cipher) | Bullet-proof dedup key, survives Upwork re-wording the description | **DONE** (fork SHA `dc955273`) |
+| 4 | Keep raw posted-time text alongside the parsed timestamp | Diagnosability when `parse_time` fails | **DONE** (fork SHA `dc955273`) |
 
 ### Implementation notes
 
