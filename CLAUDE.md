@@ -126,7 +126,8 @@ Pinned by SHA in `requirements.txt`. Roadmap and per-fix status in [UPWORK_ANALY
 | `4d901e19` | Null-safety on post_time + description (placeholder articles were crashing) |
 | `e4417966` | Tier 3 Step A: replace click-panel with `driver.get(detail_url)`. Kills location race. |
 | `fcbfe6ad` | Fix `post_time` (now `small[data-test="job-pubilshed-date"]`) and `client_total_spent` (drop ` > span`) after Upwork's May-2026 redesign. |
-| `92dbb6c8` | **Current pin.** Add `known_job_ids` to `JobsScraper`; `parse_one_job` skips the per-job `driver.get(detail_url)` when job_id is already known. ~3× faster on typical daily runs (80%+ repeats). |
+| `92dbb6c8` | Add `known_job_ids` to `JobsScraper`; `parse_one_job` skips the per-job `driver.get(detail_url)` when job_id is already known. ~3× faster on typical daily runs (80%+ repeats). |
+| `c7021cd9` | **Current pin.** Properly URL-encode the search query in `construct_url` (was only replacing spaces). Unlocks boolean queries like `("RAG" OR "LangChain") AND ("Finance")` — quotes/parens were breaking uc-Chrome's stealth JS injection. |
 
 ## Next steps (in priority order)
 
