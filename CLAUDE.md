@@ -78,8 +78,8 @@ Replaced single-keyword "Business Analyst" with five overlapping boolean queries
 |---|---|---|
 | `KRmemQFoahALiKfh` | `upwork-> master sheet -> CV match -> email shortlist` | Active ✓ |
 | `1XmONTJZmHPCRS6p` | `upwork-> Proposal generator (webhook: /proposal-gen)` | Active ✓ |
-| `tW6gDZ4bwjpNsi7r` | `upwork-> Save job (webhook: /save-job)` | **NEEDS ACTIVATION** + Sheets credentials |
-| `DvxtaYExd32PvOVC` | `upwork-> Weekly archive (>30d -> MySQL)` | **NEEDS ACTIVATION** + Sheets & MySQL credentials |
+| `tW6gDZ4bwjpNsi7r` | `upwork-> Save job (webhook: /save-job)` | Active ✓ (since 2026-05-21) |
+| `DvxtaYExd32PvOVC` | `upwork-> Weekly archive (>30d -> MySQL)` | Active ✓ (since 2026-05-21; first fire: next Sunday 03:00 BG) |
 
 Note: n8n's folder feature requires the paid tier; we use the `upwork->` name prefix instead. The MCP `addTag` operation is buggy (errors with `Cannot read properties of undefined`), so don't bother with tags.
 
@@ -201,16 +201,9 @@ We invested ~4 hours running the scraper inside Docker on Contabo. Every reasona
 
 Do not retry without spending money (Bright Data Scraping Browser ~$15/mo, OR a Windows VPS). Dockerfile/entrypoint.sh/deploy/ still in repo for reference.
 
-## Pending activations (in user's court)
+## Pending (in user's court)
 
-1. **Activate `upwork-> Save job` workflow** in n8n UI:
-   - Wire Google Sheets credential on "Look up job by id" and "Append to saved_jobs" nodes
-   - Toggle Active
-2. **Activate `upwork-> Weekly archive` workflow** in n8n UI:
-   - Wire Google Sheets credential on "Read upwork_master" and "Delete archived rows"
-   - Wire MySQL credential (`MySQL stockprojectdb`) on "Insert into upwork_history"
-   - Toggle Active
-3. **Windows Task Scheduler** for daily `python main.py` runs at **08:00 + 17:00 BG** (user's chosen schedule — covers US East Coast morning peak at 17:00 BG = 10:00 ET).
+1. **Windows Task Scheduler** for daily `python main.py` runs at **08:00 + 17:00 BG** (user's chosen schedule — covers US East Coast morning peak at 17:00 BG = 10:00 ET). All other automation is now active.
 
 ## Code layout
 
@@ -275,12 +268,11 @@ docker exec -it mysql mysql -uequitiesradar -p stockprojectdb
 
 ## Forward roadmap (in priority)
 
-1. **Activate the two pending workflows** (save-job + weekly-archive). 1 min in n8n UI.
-2. **Windows Task Scheduler** at 08:00 + 17:00 BG.
-3. **Quality of "Generate Proposal" output** — once user has clicked it ~10 times, refine the prompt based on what feels generic.
-4. **Investigate String 5 driver-crash root cause** — try shorter query, try `max_workers=1` for that one title, capture exact crashing job.
-5. **Maybe Tier 3 Step B** (parallel detail fetching within a title) — only if first-day runs become a problem after Task Scheduler ramps up.
-6. **Migration to Notion or Airtable** for `saved_jobs` — only if/when sheet's UX becomes painful for the review workflow. n8n nodes exist for both; the webhook URL stays the same.
+1. **Windows Task Scheduler** at 08:00 + 17:00 BG.
+2. **Quality of "Generate Proposal" output** — once user has clicked it ~10 times, refine the prompt based on what feels generic.
+3. **Investigate String 5 driver-crash root cause** — try shorter query, try `max_workers=1` for that one title, capture exact crashing job.
+4. **Maybe Tier 3 Step B** (parallel detail fetching within a title) — only if first-day runs become a problem after Task Scheduler ramps up.
+5. **Migration to Notion or Airtable** for `saved_jobs` — only if/when sheet's UX becomes painful for the review workflow. n8n nodes exist for both; the webhook URL stays the same.
 
 ## Useful commands
 
