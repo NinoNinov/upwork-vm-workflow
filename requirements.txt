@@ -2,7 +2,7 @@
 # Pinned to our fork's commit SHA. The fork adds card-level location reading
 # (fixes stale-panel race), job url + job_id capture, and raw post-time text.
 # See UPWORK_ANALYSIS_ROADMAP.md for the full list of fork patches.
-upwork_analysis @ git+https://github.com/NinoNinov/upwork_analysis.git@c7021cd966d7ec629e9116da3422b77a0f3cca38
+upwork_analysis @ git+https://github.com/NinoNinov/upwork_analysis.git@95965d5813ee3556bfd8cb0ad73e71a90f2d3f35
 
 # Scraper transitive deps (also pulled in by upwork_analysis, listed for clarity)
 seleniumbase>=4.20

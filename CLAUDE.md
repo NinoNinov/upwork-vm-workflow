@@ -127,7 +127,8 @@ Pinned by SHA in `requirements.txt`. Roadmap and per-fix status in [UPWORK_ANALY
 | `e4417966` | Tier 3 Step A: replace click-panel with `driver.get(detail_url)`. Kills location race. |
 | `fcbfe6ad` | Fix `post_time` (now `small[data-test="job-pubilshed-date"]`) and `client_total_spent` (drop ` > span`) after Upwork's May-2026 redesign. |
 | `92dbb6c8` | Add `known_job_ids` to `JobsScraper`; `parse_one_job` skips the per-job `driver.get(detail_url)` when job_id is already known. ~3× faster on typical daily runs (80%+ repeats). |
-| `c7021cd9` | **Current pin.** Properly URL-encode the search query in `construct_url` (was only replacing spaces). Unlocks boolean queries like `("RAG" OR "LangChain") AND ("Finance")` — quotes/parens were breaking uc-Chrome's stealth JS injection. |
+| `c7021cd9` | Properly URL-encode the search query in `construct_url` (was only replacing spaces). Unlocks boolean queries like `("RAG" OR "LangChain") AND ("Finance")` — quotes/parens were breaking uc-Chrome's stealth JS injection. |
+| `95965d58` | **Current pin.** Resilience: `parse_time` handles `quarter`/`year` units + returns None on unparseable input. `_scrape_pages` wraps `parse_one_job` in try/except — driver-death errors mark the page as failed (retry_failed picks it up); per-job errors skip just that article. Previously one bad article would kill 48 of 50 jobs by crashing the worker thread. |
 
 ## Next steps (in priority order)
 

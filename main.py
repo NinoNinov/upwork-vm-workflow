@@ -88,6 +88,32 @@ def main() -> ScrapingResult:
                 len(job_titles), scraping_config.max_workers)
     scraped = scraper.scrape_jobs_per_title_parallel(job_titles)
 
+    # Recovery pass: retry any title that came back with < 50% of expected
+    # rows. Symptoms of partial results: uc-Chrome session deaths mid-thread,
+    # transient captchas, parse_one_job crashes. The fork has per-job
+    # try/except now so total wipeouts are rare, but a thread that dies early
+    # still loses most of the page. One sequential retry covers the gap.
+    UNDER_QUOTA_RATIO = 0.5
+    expected_per_page = scraping_config.jobs_per_page
+    under_quota = []
+    for title, pages in job_titles.items():
+        expected = pages * expected_per_page
+        got = len(scraped.get(title, []))
+        if got < expected * UNDER_QUOTA_RATIO:
+            under_quota.append((title, pages, got, expected))
+    if under_quota:
+        logger.warning("Under-quota titles after first pass: %d", len(under_quota))
+        for title, pages, got, expected in under_quota:
+            logger.warning("  '%s' got %d/%d -- retrying sequentially.",
+                           title[:80], got, expected)
+            retry_df = scraper._scrape_single_title(title, pages)
+            if retry_df is not None and len(retry_df) > got:
+                scraped[title] = retry_df
+                logger.info("  '%s' recovered: %d rows.", title[:80], len(retry_df))
+            else:
+                logger.warning("  '%s' retry did not improve count (still %d).",
+                               title[:80], got)
+
     titles_failed = [t for t in job_titles if t not in scraped]
     if not scraped:
         logger.error("Scraping returned no data for any title.")
