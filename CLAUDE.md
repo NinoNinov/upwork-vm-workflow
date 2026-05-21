@@ -173,7 +173,8 @@ Pinned by SHA in `requirements.txt`. Full details in [UPWORK_ANALYSIS_ROADMAP.md
 | `fcbfe6ad` | Fix `post_time` (now `small[data-test="job-pubilshed-date"]`) and `client_total_spent` (drop ` > span`) after Upwork's May-2026 redesign. |
 | `92dbb6c8` | Add `known_job_ids` parameter to `JobsScraper`; `parse_one_job` skips detail fetch for known jobs. |
 | `c7021cd9` | Properly URL-encode the search query — unlocks boolean queries with `"` and `()`. |
-| `95965d58` | **Current pin.** parse_time quarter/year support + per-job error containment in `_scrape_pages`. |
+| `95965d58` | parse_time quarter/year support + per-job error containment in `_scrape_pages`. |
+| `a7639829` | **Current pin.** `parse_budget` returns a human-readable string (`"$18-25/hr"`, `"$200"`) instead of an int (was averaging the hourly range and destroying both range + type signal). |
 
 ## Known broken / partial fields
 
