@@ -1,6 +1,6 @@
 # CLAUDE.md -- Upwork-VM-workflow
 
-> Project bootstrapped 2026-05-19. Last comprehensive update: **2026-05-21**.
+> Project bootstrapped 2026-05-19. Last comprehensive update: **2026-05-22**.
 > Started as a containerized Contabo deployment; pivoted to **Windows-laptop
 > scraper + Contabo VM hosting n8n + Google Sheets sink + MySQL archive** after
 > Cloudflare/Datadome blocked headless Chrome on datacenter IPs.
@@ -53,9 +53,9 @@ Replaced single-keyword "Business Analyst" with five overlapping boolean queries
    ```
    ("Financial Data Scientist" OR "Quant" OR "Quantitative" OR (("Machine Learning" OR "ML Engineer" OR "AI Engineer") AND ("Finance" OR "Trading" OR "Stock" OR "Options" OR "Portfolio")))
    ```
-2. **Fintech & Advanced Analytics**
+2. **Fintech & Advanced Analytics** (broadened 2026-05-22 to also catch FP&A / Financial Analyst / Excel + Google Sheets work — was missing a whole category of jobs the candidate is qualified for)
    ```
-   ("Financial Modeling" OR "Valuation") AND ("Tableau" OR "Power BI" OR "Python" OR "Predictive")
+   ("Financial Modeling" OR "Valuation" OR "Financial Analysis" OR "FP&A" OR "Financial Planning" OR "Forecasting") AND ("Excel" OR "Google Sheets" OR "Tableau" OR "Power BI" OR "Python" OR "QuickBooks")
    ```
 3. **Financial GenAI & Agentic Workflows**
    ```
@@ -88,10 +88,19 @@ Note: n8n's folder feature requires the paid tier; we use the `upwork->` name pr
 `Sheets Trigger -> Aggregate -> Read CV doc -> Build LLM prompt -> OpenAI gpt-4o-mini (jsonOutput=true) -> Filter matches + build email body (Code) -> Gmail send`
 
 Key facts:
-- Threshold: score ≥ 7/10
+- **Threshold:** score ≥ **6**/10 (lowered from 7 on 2026-05-22 — user is new to Upwork, wants broader inclusion).
 - LLM returns `{"jobs": [{"index", "score", "reason"}, ...]}` — the wrapper key is required because `jsonOutput=true` forces an object root.
+- **LLM prompt has 5-lane framing** (2026-05-22): explicitly names the candidate's 5 credible lanes (Quant/FDS, FP&A/BA, Corporate Finance, GenAI workflows, Data Engineering) and tells the LLM not to penalize jobs for "lacking quantitative finance focus" if they fit a different lane. Includes scoring rubric: 9-10 perfect, 7-8 strong, 5-6 partial, 0-4 not a fit. Validated by re-scoring an FP&A job that went from 6 (old prompt) → 9 (new prompt).
 - Filter node JS has heavy logic: HTML escaping, category derivation via keyword fingerprint on the `position` field, render order, two button URLs.
-- Email is HTML (`emailType: html`). Matches grouped by 5 categories + "Other", each line shows `[score/10] · <link>title</link> · Posted X ago / why / budget / client / [📝 Generate proposal] [🗂️ Save for later]`.
+- **Email is HTML** (`emailType: html`) with bold labels, 13px font for the chip lines. Matches grouped by 5 categories + "Other". Each line shows:
+  ```
+  [score/10] · <link>Title</link> · Posted X ago
+  why: ...
+  type: Hourly · level: Expert · duration: 1-3 months · budget: $18-25/hr
+  proposals: 5 to 10 · client: United States ($140K spent)
+  [📝 Generate proposal]  [🗂️ Save for later]
+  ```
+  Empty fields drop out (no "n/a" clutter). Budget is the readable string from the fork (e.g. `"$18-25/hr"` for hourly ranges, `"$200"` for fixed) — never an averaged integer.
 
 ### Workflow 2: proposal generator (`1XmONTJZmHPCRS6p`)
 
@@ -155,10 +164,46 @@ The redundant `upwork_pipeline` database + `upwork_n8n` user I initially created
 3. **`main.py`** outer-loop retry: after the parallel scrape, any title that returned < 50% of expected rows is re-scraped sequentially. **This recovered String 1 (Quant) from 0 → 50 jobs in a real run on 2026-05-21.**
 
 ### Timing
-- **Daily run, ~80% repeats:** ~3-5 min wall
+- **Daily run, ~80% repeats:** ~3-5 min wall (theoretical)
+- **Daily run with uc-Chrome crashes triggering outer-loop retries:** ~30-60 min wall (typical reality)
 - **First-ever scrape (empty skip set), 5 strings, 3 parallel workers:** ~20 min wall
 - **Single 50-job string with empty skip set:** ~13 min sequential
-- Detail-page fetch (~15s/job) is the dominant cost; skip-set eliminates that for known jobs.
+- Detail-page fetch (~15s/job) is the dominant cost; skip-set eliminates that for known jobs. uc-Chrome instability is the dominant cost when crashes hit.
+
+## Re-scoring existing rows (no UI Retry available)
+
+n8n's Sheets trigger only fires on **newly added** rows — existing rows never get re-scored. n8n's executions UI in this version does **not** expose a Retry button for successful executions (only failed ones). So if you change the prompt or threshold and want to re-score historical jobs, the workaround is:
+
+```bash
+# 1) Delete the rows you want to re-score from upwork_master via gspread:
+python -c "
+import gspread; from google.oauth2.service_account import Credentials
+creds = Credentials.from_service_account_file('secrets/sa.json', scopes=['https://www.googleapis.com/auth/spreadsheets'])
+ws = gspread.authorize(creds).open_by_key('1wsLPktPzfIdf0dSKX0Ghxa21mnI8kdJ2FaZLAmX27QQ').worksheet('upwork_master')
+records = ws.get_all_records()
+needles = ['Title fragment 1', 'Title fragment 2']  # edit
+found = [(i, r['title'], r['job_id']) for i, r in enumerate(records, start=2) if any(n.lower() in (r.get('title') or '').lower() for n in needles)]
+for row_idx, _, _ in sorted(found, key=lambda x: -x[0]): ws.delete_rows(row_idx)
+print('Deleted', len(found))
+"
+
+# 2) Re-run the scraper. The deleted job_ids leave the skip-set, so they get re-scraped → re-added → n8n trigger fires → fresh scoring with current prompt/threshold.
+python main.py
+```
+
+Validated 2026-05-22: an FP&A job that scored 6 under the old "be strict" prompt scored 9 under the new 5-lane prompt after this delete+rescrape cycle.
+
+## Coverage strategy (frequency over depth)
+
+Each Upwork search returns only the top 50 most recent jobs. Jobs older than the top 50 fall off the first page and are **invisible to our scraper**.
+
+| Approach | Trade-off |
+|---|---|
+| **More frequent scrapes (4x/day)** | Best ROI. Jobs caught within ~6h of posting. No code change — just Task Scheduler. |
+| **Pagination (pages 2-3)** | ~20 min code change. Doubles runtime. Modest catch increase since page-2 jobs are 12-24h old anyway. |
+| **Manual URL-add for jobs you discover elsewhere** | ~30 min build. Niche but useful for "I saw this on the Upwork app, want it in CRM". |
+
+**Conclusion:** if you want to maximize what the pipeline sees, run more often. The bottleneck is timing, not depth.
 
 ## Fork history (`NinoNinov/upwork_analysis`)
 
