@@ -13,6 +13,30 @@
 > Save-for-later stays for "maybe", CRM is "I'll apply". First real test record
 > landed at `rec21keJn4MQHYJvF` with Stage=To Apply and all 21 auto-populated
 > fields correct including the singleSelect resolutions.
+>
+> **2026-05-23:** Save-for-later flow migrated from Google Sheets → Airtable.
+> New table `Jobs for Learning` in the same base (`tblWjJiPZtqPYqcH0`). The 🗂️
+> button now upserts into Airtable (Status='To Review'). Schema adds `Questions`
+> (renamed from notes), `Answers`, `Lesson learned` (multilineText), `Learning
+> tags` (multipleSelects: Pricing strategy · Client red flag · Niche knowledge ·
+> Proposal style · Market trends · Skill gap · Tech stack · Decline rationale),
+> `Resolved` (checkbox). 11 historical saved_jobs rows migrated. The `saved_jobs`
+> Sheet tab is now read-only archive — no new writes.
+>
+> **2026-05-23 (later):** Added LLM auto-answer for the Jobs for Learning table.
+> Write a question in `Questions`, click the auto-generated `Answer Me` URL in
+> the row, gpt-4o-mini reads the job + Questions and writes a numbered answer
+> into `Answers`. The Answer Me URL is a formula field that only renders when
+> Questions is filled AND Answers is empty (so the link auto-hides once done).
+> Per-question cost ~$0.0004. Workflow `0htuFAiNphJOmjeJ`.
+>
+> **2026-05-23 (even later):** Consolidated 🎯 Add to CRM + 📝 Generate proposal
+> into a single button. The old 📝 button is gone from the email; clicking 🎯
+> now (a) generates the tailored proposal Doc, (b) writes the Doc URL into the
+> CRM row's `Proposal Doc` field, and (c) redirects the browser to the new Doc.
+> ~11 sec end-to-end. Standalone Workflow 2 (`1XmONTJZmHPCRS6p`) is **deactivated**
+> but kept for manual hits at `/webhook/proposal-gen` if you want a proposal
+> without touching the CRM.
 
 ## End-to-end pipeline (current)
 
@@ -29,11 +53,12 @@ python main.py
                                          -> filter score >= 6
                                          -> grouped HTML email   -----> nino.ninov@hotmail.com
                                               (5 niche sections,
-                                               post-time, 3 buttons per match)
+                                               post-time, 2 buttons per match)
 
-Click [📝 Generate proposal] -> webhook -> OpenAI proposal -> Google Doc -> redirect
-Click [🗂️ Save for later]    -> webhook -> append to saved_jobs tab -> confirm page
-Click [🎯 Add to CRM]        -> webhook -> upsert into Airtable Jobs -> confirm page
+Click [🗂️ Save for later]                    -> webhook -> upsert into Jobs for Learning -> confirm page
+Click [🎯 Add to CRM + Generate Proposal]    -> webhook -> read CV -> OpenAI proposal -> create Doc
+                                                          -> upsert into CRM Jobs (with Doc URL)
+                                                          -> redirect to the new Doc
 
 Every Sunday 03:00 BG: n8n archives upwork_master rows older than 30 days
   -> INSERT IGNORE into stockprojectdb.upwork_history (MySQL on Contabo)
@@ -46,7 +71,7 @@ Every Sunday 03:00 BG: n8n archives upwork_master rows older than 30 days
 |---|---|
 | Output Google Sheet | `1wsLPktPzfIdf0dSKX0Ghxa21mnI8kdJ2FaZLAmX27QQ` |
 | `upwork_master` tab gid | `856015411` |
-| `saved_jobs` tab gid | `1662370258` (created 2026-05-21) |
+| `saved_jobs` tab gid | `1662370258` (created 2026-05-21; **frozen 2026-05-23** — read-only archive of 11 pre-migration rows; new saves go to Airtable) |
 | `Job Titles` tab | same spreadsheet — holds the 5 boolean queries |
 | Candidate CV doc | `1k6iXZLxle4Ad9JRIFPpDges7bw_BuvNWm0X_arohZfQ` |
 | Upwork Proposals folder (Drive) | `1Z1oBFGoYU0ubFnYoSEzPRLjjmq-qawu-` |
@@ -55,7 +80,8 @@ Every Sunday 03:00 BG: n8n archives upwork_master rows older than 30 days
 | GitHub project repo | `https://github.com/NinoNinov/upwork-vm-workflow` |
 | GitHub fork of upwork_analysis | `https://github.com/NinoNinov/upwork_analysis` (pinned by SHA) |
 | Airtable base "UpWork CRM" | `appt7YTCDyDTsmDB3` (rename pending in UI; was "Untitled Base") |
-| Airtable `Jobs` table | `tblW8crxJKQmAb9Vd` |
+| Airtable `Jobs` table (CRM) | `tblW8crxJKQmAb9Vd` |
+| Airtable `Jobs for Learning` table (Save) | `tblWjJiPZtqPYqcH0` |
 
 ## 5-string search strategy (current Job Titles)
 
@@ -84,15 +110,16 @@ Replaced single-keyword "Business Analyst" with five overlapping boolean queries
 
 5 strings × 50 jobs × 3 parallel workers ≈ **~20 min wall clock** for a clean run. Daily skip-set cuts that to ~5 min on subsequent runs.
 
-## n8n workflows (5 of them, all prefixed `upwork->`)
+## n8n workflows (6 of them, all prefixed `upwork->`)
 
 | ID | Name | Status |
 |---|---|---|
 | `KRmemQFoahALiKfh` | `upwork-> master sheet -> CV match -> email shortlist` | Active ✓ |
-| `1XmONTJZmHPCRS6p` | `upwork-> Proposal generator (webhook: /proposal-gen)` | Active ✓ |
-| `tW6gDZ4bwjpNsi7r` | `upwork-> Save job (webhook: /save-job)` | Active ✓ (since 2026-05-21) |
+| `1XmONTJZmHPCRS6p` | `upwork-> Proposal generator (webhook: /proposal-gen)` | **Deactivated** 2026-05-23 — folded into Workflow 5; kept for manual hits |
+| `tW6gDZ4bwjpNsi7r` | `upwork-> Save job (webhook: /save-job)` | Active ✓ (since 2026-05-21; rewired to Airtable 2026-05-23) |
 | `DvxtaYExd32PvOVC` | `upwork-> Weekly archive (>30d -> MySQL)` | Active ✓ (since 2026-05-21; first fire: next Sunday 03:00 BG) |
-| `VxQXLbsH7WBZdIqf` | `upwork-> Add to CRM (webhook: /add-to-crm)` | Active ✓ (since 2026-05-22) |
+| `VxQXLbsH7WBZdIqf` | `upwork-> Add to CRM + Generate proposal (webhook: /add-to-crm)` | Active ✓ (combined 2026-05-23) |
+| `0htuFAiNphJOmjeJ` | `upwork-> Answer learning questions (webhook: /answer-learning-questions)` | Active ✓ (since 2026-05-23) |
 
 Note: n8n's folder feature requires the paid tier; we use the `upwork->` name prefix instead. The MCP `addTag` operation is buggy (errors with `Cannot read properties of undefined`), so don't bother with tags.
 
@@ -111,27 +138,41 @@ Key facts:
   why: ...
   type: Hourly · level: Expert · duration: 1-3 months · budget: $18-25/hr
   proposals: 5 to 10 · client: United States ($140K spent)
-  [📝 Generate proposal]  [🗂️ Save for later]  [🎯 Add to CRM]
+  [🗂️ Save for later]  [🎯 Add to CRM + Generate Proposal]
   ```
   Empty fields drop out (no "n/a" clutter). Budget is the readable string from the fork (e.g. `"$18-25/hr"` for hourly ranges, `"$200"` for fixed) — never an averaged integer.
 
-  Buttons in order: blue (📝 proposal), amber (🗂️ save), purple #7c3aed (🎯 CRM). Each button's URL carries `job_id` + `score` + `reason` so downstream workflows can populate without re-querying the LLM.
+  Buttons in order: amber (🗂️ save), purple #7c3aed (🎯 CRM + proposal). Each button's URL carries `job_id` + `score` + `reason` so downstream workflows can populate without re-querying the LLM. The standalone 📝 Generate proposal button was retired 2026-05-23 — proposal generation is now bundled into the 🎯 CRM click.
 
-### Workflow 2: proposal generator (`1XmONTJZmHPCRS6p`)
+### Workflow 2: proposal generator (`1XmONTJZmHPCRS6p`) — **DEACTIVATED 2026-05-23**
 
-Triggered by `GET /webhook/proposal-gen?job_id=~02...` from the email's blue button.
+Standalone proposal pipeline. Was previously triggered by the email's blue 📝 button at `GET /webhook/proposal-gen?job_id=~02...`. The whole chain (Webhook → Sheet lookup → CV doc → OpenAI → Doc create → Doc insert → redirect) was lifted as-is into Workflow 5 so the 🎯 button does CRM + proposal in one click.
 
-`Webhook -> Lookup job in upwork_master by job_id -> Read CV doc -> Build prompt (Code) -> OpenAI gpt-4o-mini -> Build doc title + body (Code) -> Google Docs Create (in Upwork Proposals folder, title "[YYYY-MM-DD] Job Title") -> Google Docs Update (insert proposal text) -> Respond with HTML redirect to the new Doc`
-
-Click → ~7-10s spinner page → redirect to a Google Doc with the AI-generated tailored proposal.
+Kept deactivated (not deleted) in case you want to manually generate a proposal without touching the CRM — re-activate via `n8n_update_partial_workflow` `activateWorkflow` and hit `/webhook/proposal-gen?job_id=...` directly.
 
 ### Workflow 3: save for later (`tW6gDZ4bwjpNsi7r`)
 
 Triggered by `GET /webhook/save-job?job_id=...&score=...&reason=...` from the email's amber button.
 
-`Webhook -> Lookup job in upwork_master -> Build saved_jobs row (Code) -> Append to saved_jobs tab -> Respond with confirmation page`
+`Webhook -> Lookup job in upwork_master -> Build Airtable record (Learning) (Code) -> Upsert into Jobs for Learning (Airtable, matchingColumns=["Job ID"]) -> Respond with HTML confirmation linking to the new record`
 
-Appends a row to `saved_jobs` with: `date_saved, job_id, title, url, score, reason, position, budget, client_location, description (truncated 3000 chars), status='to review', notes=''`. User manually reviews the tab later and updates `status` / `notes` columns.
+**Migrated from Google Sheets to Airtable on 2026-05-23** — webhook path stayed `/save-job` so the email button needed no changes. Now writes to Airtable base `appt7YTCDyDTsmDB3` table `Jobs for Learning` (`tblWjJiPZtqPYqcH0`) with Status='To Review' default. Uses the same `Airtable PAT (UpWork CRM)` credential (`ug69ATHFWCtlHkDw`) as Workflow 5.
+
+**Idempotent by Job ID** — clicking save twice updates instead of duplicating. Unlike Workflow 5, this one writes fewer fields (just the LLM-refresh + scraped basics + Status='To Review') because the Learning table has manual fields (`Questions`, `Answers`, `Lesson learned`, `Learning tags`, `Resolved`) that the workflow should never overwrite. The same Stage-reset-on-reclick caveat from Workflow 5 applies to Status: re-clicking on a job you've manually moved to 'Studying'/'Reviewed' will reset it to 'To Review'.
+
+**Budget coercion in Code node:** uses the same `fmtBudget()` helper as Workflow 5 — fixed-price jobs return a number, hourly jobs a string; both get normalized to a string with `$` prefix before the upsert. Without this, fixed-price saves hit the same 422 `INVALID_VALUE_FOR_COLUMN` error that bit Workflow 5 on 2026-05-22.
+
+### Workflow 6: Answer learning questions (`0htuFAiNphJOmjeJ`)
+
+Triggered by `GET /webhook/answer-learning-questions?record_id=rec...` from the `Answer Me` formula link inside the Airtable `Jobs for Learning` table.
+
+`Webhook -> Airtable Get record -> Code (build prompt or skip) -> IF (skip flag) -> [skip branch] Respond Skipped / [proceed branch] OpenAI gpt-4o-mini -> Code (extract answer) -> Airtable Update -> Respond OK`
+
+The Code node's gate skips with friendly messages if either: (a) `Questions` is empty, (b) `Answers` is already filled — so re-clicking doesn't overwrite. To re-answer, manually clear the Answers field; the `Answer Me` URL will reappear (it's a formula that only renders when Questions filled AND Answers empty).
+
+Cost: ~$0.0004 per click on gpt-4o-mini. Latency: ~5-9 sec end-to-end (OpenAI is the dominant cost).
+
+**Gotcha discovered in first-run testing:** n8n's Airtable node has inconsistent output shapes across operations. The `upsert` operation returns fields flat at the root of `$json` (so `$json["Title"]` works). The `get` operation returns fields nested under `$json.fields` (so you need `$json.fields["Title"]`). Both share the v2.2 node but route through different upstream handlers. The first build of the answer Code node read `r["Questions"]` (the upsert pattern) and got `undefined` → always tripped the "no Questions" skip gate. Fixed by reading `r.fields["Questions"]`. If you build a new workflow that uses Airtable `get`, mirror this pattern.
 
 ### Workflow 4: weekly archive (`DvxtaYExd32PvOVC`)
 
@@ -139,13 +180,15 @@ Appends a row to `saved_jobs` with: `date_saved, job_id, title, url, score, reas
 
 Idempotent: `INSERT IGNORE` skips duplicates on the unique `job_id` index. If MySQL fails, the downstream Sheets Delete doesn't run (n8n error propagation), so the sheet stays consistent. Re-run picks up where it left off.
 
-### Workflow 5: Add to CRM (`VxQXLbsH7WBZdIqf`)
+### Workflow 5: Add to CRM + Generate proposal (`VxQXLbsH7WBZdIqf`)
 
-Triggered by `GET /webhook/add-to-crm?job_id=...&score=...&reason=...` from the email's purple button.
+Triggered by `GET /webhook/add-to-crm?job_id=...&score=...&reason=...` from the email's purple button. **11 nodes, ~11 sec end-to-end** (OpenAI proposal + Google Docs create + Airtable upsert dominate; sheet lookup + CV read add ~1.5 sec).
 
-`Webhook -> Lookup job in upwork_master -> Build Airtable record (Code) -> Airtable Upsert (matchingColumns=["Job ID"]) -> Respond with HTML confirmation linking to the new record`
+`Webhook -> Sheet lookup -> Read CV doc -> Build proposal prompt (Code) -> OpenAI gpt-4o-mini -> Build doc title+body (Code) -> Google Docs Create (in Upwork Proposals folder) -> Google Docs Update (insert proposal text) -> Build Airtable record with Doc URL (Code) -> Airtable Upsert (matchingColumns=["Job ID"]) -> Respond with meta-refresh redirect to the Doc`
 
-The Code node normalizes:
+The chain merges the old Workflow 2 (proposal-gen) and the old standalone Add to CRM. Sequential by design — the Airtable upsert runs LAST so the `Proposal Doc` field can be populated with the freshly-created Doc URL. Browser ends up on the new Doc after a 1-sec meta-refresh on the confirmation page.
+
+The first Code node normalizes:
 - `Type`: any value containing "hour" → `Hourly`; "fix"/"budget" → `Fixed`.
 - `Experience level`: substring match to `Entry` / `Intermediate` / `Expert`.
 - `Matched lane` (singleSelect): derived from `position` substring — Quant/FDS · FP&A/BA · Corporate Finance · GenAI workflows · Data Engineering · Other. Decoupled from the email's 5-category grouping; this represents which CV strength best matches the job.
@@ -166,8 +209,8 @@ The Code node normalizes:
 ### `upwork_master` (32 columns, the live tab)
 `position, title, url, job_id, description, time, time_raw, skills, type, experience_level, time_estimate, budget, proposals, client_location, client_jobs_posted, client_hire_rate, client_hourly_rate, client_total_spent, continent, extraction_date, StartUp, Valuation, word_count, description_label, position_en, type_en, time_estimate_en, experience_level_en, client_location_en, continent_en, description_label_en, proposals_en`
 
-### `saved_jobs` (12 columns, manual review queue)
-`date_saved, job_id, title, url, score, reason, position, budget, client_location, description, status, notes`
+### `saved_jobs` (12 columns, **frozen 2026-05-23**)
+`date_saved, job_id, title, url, score, reason, position, budget, client_location, description, status, notes` — historical archive of 11 saves from 2026-05-21 to 2026-05-23. No new writes; the n8n Save workflow now targets the Airtable `Jobs for Learning` table instead. Safe to delete the tab if you don't need the archive.
 
 ### Sheet header is enforced
 `SheetsWriter.ensure_header()` raises if row 1 of `upwork_master` doesn't match `sheets_writer.COLUMNS`. Either edit the constant or wipe the tab content to rebuild.
@@ -189,6 +232,18 @@ The Code node normalizes:
 **Outcome / financials (5, fill if hired):** `Contract value`, `Hours logged`, `Earnings to date`, `Hire date`, `End date`.
 
 Default Airtable "Table 1" fields `Assignee` and `Status` were deleted via the UI 2026-05-22. `Attachments` (multipleAttachments — useful for proposal/contract screenshots) and `Attachment Summary` (aiText) were kept. Field order in the Grid view is per-view and user-controlled: user reordered so `Stage` lands where the old `Status` was, with `Connects` + `Cost in EUR` immediately after `Stage`. The MCP doesn't expose `delete_field` or field reordering — both are UI-only operations.
+
+## Airtable Save schema (base `appt7YTCDyDTsmDB3`, table `Jobs for Learning`)
+
+16 fields. Lean compared to the CRM Jobs table because the Learning table is a study queue, not a pipeline.
+
+**Auto-populated by the Save workflow (11):** `Title` (primary, singleLineText), `Job ID`, `URL`, `Date saved` (dateTime, Europe/Sofia), `Score` (number), `Reason` (multilineText), `Position`, `Budget`, `Client location`, `Description`, `Status` (singleSelect: To Review · Studying · Reviewed · Skipped, default 'To Review').
+
+**Manually filled (5):** `Questions` (multilineText — what you want to learn from this job; replaces the legacy `notes` column), `Answers` (multilineText), `Lesson learned` (multilineText), `Learning tags` (multipleSelects: Pricing strategy · Client red flag · Niche knowledge · Proposal style · Market trends · Skill gap · Tech stack · Decline rationale), `Resolved` (checkbox).
+
+The workflow only writes the 11 auto-populated fields and `Status` — manual fields are never overwritten by re-clicking the Save button. Re-saves DO reset `Status` back to 'To Review' (same caveat as the CRM `Stage` field).
+
+**`Answer Me` formula field (added 2026-05-23):** formula `IF(AND({Questions}, NOT({Answers})), "https://n8n.equitiesradar.com/webhook/answer-learning-questions?record_id=" & RECORD_ID(), BLANK())`. Renders a clickable URL only when Questions is filled and Answers is empty. Click → Workflow 6 fires → gpt-4o-mini reads job context + Questions → writes the answer back to `Answers`. URL auto-disappears after the answer is written.
 
 ## MySQL archive (Contabo VM)
 
@@ -363,7 +418,7 @@ docker exec -it mysql mysql -uequitiesradar -p stockprojectdb
 - **Dedup happens on `job_id` first, `description` as fallback** for legacy rows that lack job_id.
 - **n8n MCP `addTag` operation is buggy.** Don't waste time on it; use name prefix or direct SQLite write.
 - **Long silent periods during headless scraping are normal** — don't kill prematurely.
-- **OpenAI billing:** ~$0.001 per scrape + ~$0.001 per proposal click. ~$0.05/day at 2 scrapes/day + 5 proposals.
+- **OpenAI billing:** ~$0.001 per scrape + ~$0.001 per 🎯 CRM+proposal click + ~$0.0004 per Answer Me click. ~$0.05/day at 2 scrapes/day + 5 CRM clicks + 10 answer-me clicks. (Old standalone proposal-gen cost still applies if you manually hit that webhook.)
 - **n8n container restart will lose its `app-net` connection** if `/opt/n8n/docker-compose.yml` ever gets reverted to the backup — that's the file with `app-net: external: true` in the networks section.
 - **Cron timing:** `parse_time` writes timestamps using `datetime.now()` from the laptop (BG time, no TZ in the string). The archive workflow's date filter parses `YYYY-MM-DD HH:MM:SS` as UTC. There's a ~3h skew but doesn't matter for 30-day archival.
 - **Airtable PAT was pasted in chat 2026-05-22** (`pat7fFHsDh82cel1m.*`) to set up the credential. If chat history is sensitive, rotate the token at https://airtable.com/create/tokens and update the n8n credential `ug69ATHFWCtlHkDw`.
@@ -377,7 +432,7 @@ docker exec -it mysql mysql -uequitiesradar -p stockprojectdb
 3. **Quality of "Generate Proposal" output** — once user has clicked it ~10 times, refine the prompt based on what feels generic.
 4. **Investigate String 5 driver-crash root cause** — try shorter query, try `max_workers=1` for that one title, capture exact crashing job.
 5. **Maybe Tier 3 Step B** (parallel detail fetching within a title) — only if first-day runs become a problem after Task Scheduler ramps up.
-6. **Consolidate `saved_jobs` into the Airtable CRM.** With the Airtable Jobs table now in place, the saved_jobs sheet tab is partly redundant. Could either: (a) add a `Stage: 'Maybe'` and route the 🗂️ Save button there instead of the sheet (one workflow change, sheet retires); or (b) keep both — `saved_jobs` as a "throwaway maybe" zone, CRM as "committed pipeline". User instinct so far is (b); revisit if the duplication becomes annoying.
+6. **Decide what to do with the frozen `saved_jobs` sheet tab.** It still holds the 11 pre-migration rows. Options: delete it entirely (we have the Airtable copy), keep it indefinitely as belt-and-suspenders archive, or schedule a one-time clean-up after a few weeks of Airtable use to confirm nothing's missing.
 
 ## Useful commands
 
